@@ -16,6 +16,7 @@ const generateImagePaths = () => {
 
 const IMAGES = generateImagePaths()
 const SLIDE_INTERVAL = 5000 // 5 seconds
+const AUDIO_PATH = '/ilovepdf_pages-to-jpg/agricultural-music.mp3'
 
 export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -76,14 +77,18 @@ export default function Home() {
   }, [])
 
   // Toggle play/pause
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     setIsPlaying((prev: boolean) => {
       const newState = !prev
       if (newState) {
         startAutoSlide()
         if (audioRef.current && !isMuted) {
+          // Ensure audio is loaded before playing
+          if (audioRef.current.readyState === 0) {
+            audioRef.current.load()
+          }
           audioRef.current.play().catch((error) => {
-            console.log('Audio play failed:', error)
+            console.error('Audio play failed on toggle:', error)
           })
         }
       } else {
@@ -97,15 +102,18 @@ export default function Home() {
   }
 
   // Toggle mute
-  const toggleMute = () => {
+  const toggleMute = async () => {
     setIsMuted((prev: boolean) => {
       const newState = !prev
       if (audioRef.current) {
         audioRef.current.muted = newState
         if (!newState && isPlaying) {
           // Unmute and play if slideshow is playing
+          if (audioRef.current.readyState === 0) {
+            audioRef.current.load()
+          }
           audioRef.current.play().catch((error) => {
-            console.log('Audio play failed:', error)
+            console.error('Audio play failed on unmute:', error)
           })
         }
       }
@@ -172,11 +180,25 @@ export default function Home() {
 
   // Initialize audio on user interaction
   useEffect(() => {
-    const handleUserInteraction = () => {
+    const handleUserInteraction = async () => {
       if (audioRef.current && isPlaying && !isMuted) {
-        audioRef.current.play().catch((error) => {
-          console.log('Audio play failed:', error)
-        })
+        try {
+          await audioRef.current.play()
+          console.log('Audio started successfully')
+        } catch (error) {
+          console.error('Audio play failed:', error)
+          // Try to load the audio first
+          if (audioRef.current.readyState === 0) {
+            audioRef.current.load()
+            setTimeout(async () => {
+              try {
+                await audioRef.current?.play()
+              } catch (e) {
+                console.error('Audio retry failed:', e)
+              }
+            }, 100)
+          }
+        }
       }
     }
 
@@ -191,6 +213,56 @@ export default function Home() {
       window.removeEventListener('keydown', handleUserInteraction)
     }
   }, [isPlaying, isMuted])
+
+  // Audio error handling and initialization
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    // Set the source explicitly
+    audio.src = AUDIO_PATH
+
+    const handleError = (e: Event) => {
+      console.error('Audio error:', e)
+      const audioElement = e.target as HTMLAudioElement
+      if (audioElement.error) {
+        console.error('Audio error code:', audioElement.error.code)
+        console.error('Audio error message:', audioElement.error.message)
+        console.error('Audio src:', audioElement.src)
+      }
+    }
+
+    const handleCanPlay = () => {
+      console.log('Audio can play, readyState:', audio.readyState)
+    }
+
+    const handleLoadedData = () => {
+      console.log('Audio data loaded successfully')
+    }
+
+    const handleLoadStart = () => {
+      console.log('Audio load started')
+    }
+
+    audio.addEventListener('error', handleError)
+    audio.addEventListener('canplay', handleCanPlay)
+    audio.addEventListener('loadeddata', handleLoadedData)
+    audio.addEventListener('loadstart', handleLoadStart)
+
+    // Try to load the audio
+    try {
+      audio.load()
+    } catch (error) {
+      console.error('Audio load failed:', error)
+    }
+
+    return () => {
+      audio.removeEventListener('error', handleError)
+      audio.removeEventListener('canplay', handleCanPlay)
+      audio.removeEventListener('loadeddata', handleLoadedData)
+      audio.removeEventListener('loadstart', handleLoadStart)
+    }
+  }, [])
 
   // Handle image load
   const handleImageLoad = (index: number) => {
@@ -298,8 +370,19 @@ export default function Home() {
         muted={isMuted}
         preload="auto"
         className={styles.audio}
+        onError={(e) => {
+          console.error('Audio element error:', e)
+          const audio = e.currentTarget
+          if (audio.error) {
+            console.error('Error code:', audio.error.code, 'Message:', audio.error.message)
+          }
+        }}
+        onLoadedData={() => {
+          console.log('Audio loaded successfully')
+        }}
       >
-        <source src="/ilovepdf_pages-to-jpg/agricultural-music.mp3" type="audio/mpeg" />
+        <source src={AUDIO_PATH} type="audio/mpeg" />
+        Your browser does not support the audio element.
       </audio>
     </div>
   )
