@@ -159,7 +159,11 @@ export default function Home() {
 
   // Handle image load
   const handleImageLoad = (index: number) => {
-    setImagesLoaded((prev: Set<number>) => new Set([...prev, index]))
+    setImagesLoaded((prev: Set<number>) => {
+      const newSet = new Set(prev)
+      newSet.add(index)
+      return newSet
+    })
   }
 
   // Preload next image
