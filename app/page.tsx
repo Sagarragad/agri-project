@@ -81,9 +81,16 @@ export default function Home() {
       const newState = !prev
       if (newState) {
         startAutoSlide()
-        audioRef.current?.play().catch(console.error)
+        if (audioRef.current && !isMuted) {
+          audioRef.current.play().catch((error) => {
+            console.log('Audio play failed:', error)
+          })
+        }
       } else {
         stopAutoSlide()
+        if (audioRef.current) {
+          audioRef.current.pause()
+        }
       }
       return newState
     })
@@ -95,6 +102,12 @@ export default function Home() {
       const newState = !prev
       if (audioRef.current) {
         audioRef.current.muted = newState
+        if (!newState && isPlaying) {
+          // Unmute and play if slideshow is playing
+          audioRef.current.play().catch((error) => {
+            console.log('Audio play failed:', error)
+          })
+        }
       }
       return newState
     })
@@ -147,7 +160,7 @@ export default function Home() {
     }
   }
 
-  // Initialize auto-slide
+  // Initialize auto-slide and audio
   useEffect(() => {
     if (isPlaying) {
       startAutoSlide()
@@ -156,6 +169,28 @@ export default function Home() {
       stopAutoSlide()
     }
   }, [isPlaying, startAutoSlide, stopAutoSlide])
+
+  // Initialize audio on user interaction
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (audioRef.current && isPlaying && !isMuted) {
+        audioRef.current.play().catch((error) => {
+          console.log('Audio play failed:', error)
+        })
+      }
+    }
+
+    // Try to play on any user interaction
+    window.addEventListener('click', handleUserInteraction, { once: true })
+    window.addEventListener('touchstart', handleUserInteraction, { once: true })
+    window.addEventListener('keydown', handleUserInteraction, { once: true })
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction)
+      window.removeEventListener('touchstart', handleUserInteraction)
+      window.removeEventListener('keydown', handleUserInteraction)
+    }
+  }, [isPlaying, isMuted])
 
   // Handle image load
   const handleImageLoad = (index: number) => {
@@ -261,10 +296,10 @@ export default function Home() {
         ref={audioRef}
         loop
         muted={isMuted}
+        preload="auto"
         className={styles.audio}
       >
-        <source src="/agricultural-music.mp3" type="audio/mpeg" />
-        <source src="/agricultural-music.ogg" type="audio/ogg" />
+        <source src="/ilovepdf_pages-to-jpg/agricultural-music.mp3" type="audio/mpeg" />
       </audio>
     </div>
   )
